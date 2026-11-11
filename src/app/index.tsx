@@ -7,7 +7,7 @@ import { colors, radius } from '@/lib/theme';
 
 const STEPS = [
   { n: '1', title: 'Your contact details', body: 'Name, city, phone and email.' },
-  { n: '2', title: 'Answer 11 short questions', body: 'Talk or type. Skip any you like.' },
+  { n: '2', title: 'Answer 13 short questions', body: 'Talk or type. Skip any you like.' },
   { n: '3', title: 'See your resume', body: 'We turn your answers into a clean draft.' },
 ];
 
@@ -59,7 +59,7 @@ export default function Welcome() {
       </View>
       <Text style={s.title}>Talk-to-resume</Text>
       <Text style={s.subtitle}>
-        Answer a few questions, just like talking to a friend. We'll write your resume.
+        Answer a few questions, just like talking to a friend. We’ll write your resume.
       </Text>
 
       <View style={s.steps}>

@@ -1,6 +1,7 @@
 import { ReactNode, Ref } from 'react';
 import {
   KeyboardAvoidingView,
+  Switch,
   Platform,
   Pressable,
   ScrollView,
@@ -20,10 +21,11 @@ import { colors, radius, spacing, TAP_HEIGHT } from '@/lib/theme';
 export function Screen({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      {/*
+        The app draws edge to edge on Android, so the window no longer shrinks for the
+        keyboard there either: pad by the keyboard height on both platforms.
+      */}
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'web' ? undefined : 'padding'}>
         <ScrollView
           style={styles.flex}
           contentContainerStyle={styles.content}
@@ -139,6 +141,60 @@ export function Choice({ label, selected, onPress }: { label: string; selected: 
   );
 }
 
+/** A tap-to-toggle pill, used for multi-select answers and level pickers. */
+export function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: selected }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.chip,
+        selected && styles.chipSelected,
+        pressed && !selected && styles.buttonSecondaryPressed,
+      ]}
+    >
+      <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]}>
+        {selected ? '✓ ' : ''}
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** A full-width row with a label and an on/off switch; the whole row is tappable. */
+export function SwitchRow({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+      onPress={() => onChange(!value)}
+      style={styles.switchRow}
+    >
+      <Text style={styles.switchLabel}>{label}</Text>
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        trackColor={{ true: colors.primary, false: colors.borderStrong }}
+        thumbColor="#FFFFFF"
+      />
+    </Pressable>
+  );
+}
+
+/** A quiet full-width button such as "+ Add another language". */
+export function AddButton({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.addButton, pressed && styles.buttonSecondaryPressed]}
+    >
+      <Text style={styles.addLabel}>+ {label}</Text>
+    </Pressable>
+  );
+}
+
 export const styles = StyleSheet.create({
   flex: { flex: 1 },
   safe: { flex: 1, backgroundColor: colors.background },
@@ -214,4 +270,37 @@ export const styles = StyleSheet.create({
   },
   radioSelected: { borderColor: colors.primary },
   radioDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.primary },
+
+  chip: {
+    minHeight: 48,
+    paddingHorizontal: 18,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+  },
+  chipSelected: { borderColor: colors.primary, backgroundColor: colors.primarySofter },
+  chipLabel: { fontSize: 17, fontWeight: '600', color: colors.text },
+  chipLabelSelected: { color: colors.primary },
+
+  switchRow: {
+    minHeight: TAP_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 18,
+  },
+  switchLabel: { fontSize: 17, fontWeight: '600', color: colors.text, flex: 1 },
+
+  addButton: {
+    minHeight: TAP_HEIGHT,
+    borderRadius: radius.md,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: colors.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addLabel: { fontSize: 17, fontWeight: '600', color: colors.primary },
 });

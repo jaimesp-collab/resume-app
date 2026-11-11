@@ -3,10 +3,16 @@ import { activeJobs, Answers } from './answers';
 export type ResumeJob = {
   title: string;
   employer: string;
+  city: string;
   dates: string;
   bullets: string[];
 };
 
+export type ResumeEducation = { school: string; studied: string; when: string };
+export type ResumeCertificate = { name: string; year: string };
+export type ResumeLanguage = { name: string; level: string };
+
+/** Everything printed on the resume. Every format renders from this. */
 export type Resume = {
   name: string;
   /** Most recent job title. Left out (null) when the user has no job. */
@@ -14,12 +20,16 @@ export type Resume = {
   city: string;
   phone: string;
   email: string;
+  link: string;
   summary: string;
   experience: ResumeJob[];
-  other: string[];
+  education: ResumeEducation[];
   skills: string[];
-  education: string[];
-  certificates: string[];
+  certificates: ResumeCertificate[];
+  languages: ResumeLanguage[];
+  other: string[];
+  /** One line, e.g. "Part time, evenings and weekends. Can start right away." */
+  availability: string;
 };
 
 const STOP_WORDS = new Set([
@@ -46,10 +56,14 @@ function relevance(item: string, target: Set<string>): number {
 
 /** Stable sort: items that match the target job come first, otherwise keep the user's order. */
 export function rankByTarget(items: string[], targetJob: string): string[] {
+  return rankByTargetWith(items, (s) => s, targetJob);
+}
+
+export function rankByTargetWith<T>(items: T[], text: (item: T) => string, targetJob: string): T[] {
   const target = stems(targetJob);
   if (target.size === 0) return items;
   return items
-    .map((item, i) => ({ item, i, score: relevance(item, target) }))
+    .map((item, i) => ({ item, i, score: relevance(text(item), target) }))
     .sort((a, b) => b.score - a.score || a.i - b.i)
     .map((x) => x.item);
 }
@@ -82,11 +96,30 @@ function sentence(text: string): string {
   return capitalize(/[.!?]$/.test(t) ? t : `${t}.`);
 }
 
-function dates(start: string, end: string): string {
+function dates(start: string, end: string, current: boolean): string {
   const s = start.trim();
-  const e = end.trim();
+  const e = current ? 'Present' : end.trim();
   if (s && e) return `${s} to ${e}`;
   return s || e;
+}
+
+/** "a", "a and b", "a, b and c". */
+export function joinAnd(items: string[]): string {
+  if (items.length <= 1) return items.join('');
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
+export function availabilityLine(a: Answers['availability']): string {
+  const parts: string[] = [];
+  if (a.times.length) {
+    // Keep the chip order (Full time, Part time, Mornings…), lower-case after the first.
+    const words = a.times.map((t, i) => (i === 0 ? t : t.toLowerCase()));
+    parts.push(`${joinAnd(words)}.`);
+  }
+  const start = a.startDate.trim();
+  if (a.rightAway) parts.push('Can start right away.');
+  else if (start) parts.push(`Can start ${start.replace(/[.]+$/, '')}.`);
+  return parts.join(' ');
 }
 
 export function buildResume(a: Answers): Resume {
@@ -98,12 +131,17 @@ export function buildResume(a: Answers): Resume {
     .map((j) => ({
       title: j.title.trim(),
       employer: j.employer.trim(),
-      dates: dates(j.start, j.end),
+      city: j.city.trim(),
+      dates: dates(j.start, j.end, j.current),
       // Results first, then day-to-day duties; within each, what matters for the target job first.
       bullets: [...rankByTarget(splitLines(j.proudest), target), ...rankByTarget(splitLines(j.dayToDay), target)],
     }));
 
   const headline = jobs[0]?.title.trim() || null;
+
+  const certificates = a.certificates
+    .filter((c) => c.name.trim())
+    .map((c) => ({ name: capitalize(c.name.trim()), year: c.year.trim() }));
 
   return {
     name: a.contact.fullName.trim(),
@@ -111,11 +149,22 @@ export function buildResume(a: Answers): Resume {
     city: a.contact.city.trim(),
     phone: a.contact.phone.trim(),
     email: a.contact.email.trim(),
+    link: a.contact.link.trim(),
     summary: sentence(a.bestAt),
     experience,
-    other: rankByTarget(splitLines(a.extra), target),
+    education: a.education
+      .filter((e) => e.school.trim() || e.studied.trim())
+      .map((e) => ({
+        school: capitalize(e.school.trim()),
+        studied: capitalize(e.studied.trim()),
+        when: e.inProgress ? 'In progress' : e.year.trim(),
+      })),
     skills: rankByTarget(splitList(a.skills), target),
-    education: splitLines(a.education),
-    certificates: rankByTarget(splitLines(a.certificates), target),
+    certificates: rankByTargetWith(certificates, (c) => c.name, target),
+    languages: a.languages
+      .filter((l) => l.name.trim())
+      .map((l) => ({ name: capitalize(l.name.trim()), level: l.level ?? '' })),
+    other: rankByTarget(splitLines(a.extra), target),
+    availability: availabilityLine(a.availability),
   };
 }

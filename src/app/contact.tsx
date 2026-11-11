@@ -15,6 +15,7 @@ export default function ContactScreen() {
   const cityRef = useRef<TextInputInstance>(null);
   const phoneRef = useRef<TextInputInstance>(null);
   const emailRef = useRef<TextInputInstance>(null);
+  const linkRef = useRef<TextInputInstance>(null);
 
   const set = (patch: Partial<Contact>) =>
     update((a) => ({ ...a, started: true, contact: { ...a.contact, ...patch } }));
@@ -86,10 +87,25 @@ export default function ContactScreen() {
         textContentType="emailAddress"
         autoCapitalize="none"
         autoCorrect={false}
+        returnKeyType="next"
+        submitBehavior="submit"
+        onSubmitEditing={() => linkRef.current?.focus()}
+      />
+      {emailInvalid ? <Text style={s.error}>Check your email address. It should look like name@email.com</Text> : null}
+      <Field
+        ref={linkRef}
+        label="LinkedIn or website link (optional)"
+        value={c.link}
+        onChangeText={(link) => set({ link })}
+        placeholder="linkedin.com/in/alex-rivera"
+        keyboardType="url"
+        textContentType="URL"
+        autoComplete="url"
+        autoCapitalize="none"
+        autoCorrect={false}
         returnKeyType="done"
         onSubmitEditing={() => canContinue && next()}
       />
-      {emailInvalid ? <Text style={s.error}>Check your email address. It should look like name@email.com</Text> : null}
     </Screen>
   );
 }
@@ -97,5 +113,5 @@ export default function ContactScreen() {
 const s = StyleSheet.create({
   title: { fontSize: 28, lineHeight: 36, fontWeight: '700', color: colors.text, marginBottom: 8 },
   subtitle: { fontSize: 17, color: colors.textMuted, marginBottom: 28 },
-  error: { fontSize: 15, color: colors.danger, marginTop: -8 },
+  error: { fontSize: 15, color: colors.danger, marginTop: -8, marginBottom: 16 },
 });

@@ -1,13 +1,17 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback } from 'react';
+import { ReactNode, useCallback } from 'react';
 import { BackHandler, StyleSheet, Text, View } from 'react-native';
 
-import { Button, ButtonRow, Choice, Field, ProgressBar, Screen, TextLink } from '@/components/ui';
-import { Answers, YesNo } from '@/lib/answers';
+import { AddButton, Button, ButtonRow, Chip, Choice, Field, ProgressBar, Screen, SwitchRow, TextLink } from '@/components/ui';
+import { Answers, LANGUAGE_LEVELS, WORK_TIMES, WorkTime, YesNo } from '@/lib/answers';
 import { useAnswers } from '@/lib/AnswersContext';
 import {
+  addItem,
   buildSteps,
   isAnswered,
+  removeItem,
+  setAvailability,
+  setItem,
   setAnotherJob,
   setHasJob,
   setJob,
@@ -15,7 +19,7 @@ import {
   Step,
   TOTAL_QUESTIONS,
 } from '@/lib/questions';
-import { colors } from '@/lib/theme';
+import { colors, radius, TAP_HEIGHT } from '@/lib/theme';
 
 export default function Questions() {
   const { answers, update } = useAnswers();
@@ -137,6 +141,14 @@ function StepInput({ step, answers, update }: InputProps) {
             placeholder="Northside Warehouse"
             autoCapitalize="words"
           />
+          <Field
+            label="City (optional)"
+            value={job?.city ?? ''}
+            onChangeText={(city) => set({ city })}
+            placeholder="Chicago, IL"
+            autoCapitalize="words"
+          />
+          <SwitchRow label="I still work here" value={!!job?.current} onChange={(current) => set({ current })} />
           <View style={s.dates}>
             <View style={{ flex: 1 }}>
               <Field
@@ -147,14 +159,168 @@ function StepInput({ step, answers, update }: InputProps) {
               />
             </View>
             <View style={{ flex: 1 }}>
-              <Field
-                label="Finished"
-                value={job?.end ?? ''}
-                onChangeText={(end) => set({ end })}
-                placeholder="now"
-              />
+              {job?.current ? (
+                <View style={s.present}>
+                  <Text style={s.presentLabel}>Finished</Text>
+                  <Text style={s.presentValue}>Present</Text>
+                </View>
+              ) : (
+                <Field
+                  label="Finished"
+                  value={job?.end ?? ''}
+                  onChangeText={(end) => set({ end })}
+                  placeholder="2024"
+                />
+              )}
             </View>
           </View>
+        </View>
+      );
+    }
+
+    case 'education':
+      return (
+        <View>
+          {answers.education.map((e, i) => (
+            <ItemCard
+              key={i}
+              title={answers.education.length > 1 ? `School or training ${i + 1}` : undefined}
+              onRemove={answers.education.length > 1 ? () => update((a) => removeItem(a, 'education', i)) : undefined}
+            >
+              <Field
+                label="School or training"
+                value={e.school}
+                onChangeText={(school) => update((a) => setItem(a, 'education', i, { school }))}
+                placeholder="Lincoln High School"
+                autoCapitalize="words"
+              />
+              <Field
+                label="What you studied (optional)"
+                value={e.studied}
+                onChangeText={(studied) => update((a) => setItem(a, 'education', i, { studied }))}
+                placeholder="High school diploma, forklift training…"
+              />
+              <SwitchRow
+                label="Still in progress"
+                value={e.inProgress}
+                onChange={(inProgress) => update((a) => setItem(a, 'education', i, { inProgress }))}
+              />
+              {e.inProgress ? null : (
+                <Field
+                  label="Year finished (optional)"
+                  value={e.year}
+                  onChangeText={(year) => update((a) => setItem(a, 'education', i, { year }))}
+                  placeholder="2019"
+                  keyboardType="number-pad"
+                  maxLength={4}
+                />
+              )}
+            </ItemCard>
+          ))}
+          <AddButton label="Add another school or training" onPress={() => update((a) => addItem(a, 'education'))} />
+          <MicTip />
+        </View>
+      );
+
+    case 'languages':
+      return (
+        <View>
+          {answers.languages.map((l, i) => (
+            <ItemCard
+              key={i}
+              onRemove={answers.languages.length > 1 ? () => update((a) => removeItem(a, 'languages', i)) : undefined}
+            >
+              <Field
+                label="Language"
+                value={l.name}
+                onChangeText={(name) => update((a) => setItem(a, 'languages', i, { name }))}
+                placeholder={i === 0 ? 'Spanish' : 'English'}
+                autoCapitalize="words"
+              />
+              <Text style={s.groupLabel}>How well?</Text>
+              <View style={s.chips} accessibilityRole="radiogroup">
+                {LANGUAGE_LEVELS.map((level) => (
+                  <Chip
+                    key={level}
+                    label={level}
+                    selected={l.level === level}
+                    onPress={() =>
+                      update((a) => setItem(a, 'languages', i, { level: l.level === level ? null : level }))
+                    }
+                  />
+                ))}
+              </View>
+            </ItemCard>
+          ))}
+          <AddButton label="Add another language" onPress={() => update((a) => addItem(a, 'languages'))} />
+          <MicTip />
+        </View>
+      );
+
+    case 'certificates':
+      return (
+        <View>
+          {answers.certificates.map((c, i) => (
+            <ItemCard
+              key={i}
+              onRemove={
+                answers.certificates.length > 1 ? () => update((a) => removeItem(a, 'certificates', i)) : undefined
+              }
+            >
+              <Field
+                label="Certificate, license or award"
+                value={c.name}
+                onChangeText={(name) => update((a) => setItem(a, 'certificates', i, { name }))}
+                placeholder="Food handler card"
+              />
+              <Field
+                label="Year (optional)"
+                value={c.year}
+                onChangeText={(year) => update((a) => setItem(a, 'certificates', i, { year }))}
+                placeholder="2023"
+                keyboardType="number-pad"
+                maxLength={4}
+              />
+            </ItemCard>
+          ))}
+          <AddButton label="Add another" onPress={() => update((a) => addItem(a, 'certificates'))} />
+          <MicTip />
+        </View>
+      );
+
+    case 'availability': {
+      const av = answers.availability;
+      const toggle = (t: WorkTime) =>
+        update((a) => {
+          const times = a.availability.times.includes(t)
+            ? a.availability.times.filter((x) => x !== t)
+            : WORK_TIMES.filter((x) => x === t || a.availability.times.includes(x));
+          return setAvailability(a, { times });
+        });
+      return (
+        <View>
+          <View style={s.chips}>
+            {WORK_TIMES.map((t) => (
+              <Chip key={t} label={t} selected={av.times.includes(t)} onPress={() => toggle(t)} />
+            ))}
+          </View>
+          <Text style={[s.groupLabel, { marginTop: 24 }]}>When can you start? (optional)</Text>
+          <View style={[s.chips, { marginBottom: 14 }]}>
+            <Chip
+              label="Right away"
+              selected={av.rightAway}
+              onPress={() => update((a) => setAvailability(a, { rightAway: !a.availability.rightAway }))}
+            />
+          </View>
+          {av.rightAway ? null : (
+            <Field
+              label="Or pick a date"
+              value={av.startDate}
+              onChangeText={(startDate) => update((a) => setAvailability(a, { startDate }))}
+              placeholder="June 1"
+            />
+          )}
+          <MicTip />
         </View>
       );
     }
@@ -193,6 +359,30 @@ function AnswerBox(props: { value: string; placeholder: string; label: string; o
   );
 }
 
+function MicTip() {
+  return (
+    <View style={[s.tip, { marginTop: 18 }]}>
+      <Text style={s.tipIcon}>🎤</Text>
+      <Text style={s.tipText}>Rather talk? Tap the mic on your keyboard and say your answer.</Text>
+    </View>
+  );
+}
+
+/** One entry in a list answer (a school, a language, a certificate). */
+function ItemCard({ title, onRemove, children }: { title?: string; onRemove?: () => void; children: ReactNode }) {
+  return (
+    <View style={s.card}>
+      {title || onRemove ? (
+        <View style={s.cardHead}>
+          <Text style={s.cardTitle}>{title ?? ''}</Text>
+          {onRemove ? <TextLink label="Remove" onPress={onRemove} /> : null}
+        </View>
+      ) : null}
+      {children}
+    </View>
+  );
+}
+
 function YesNoChoices({ value, onChange }: { value: YesNo; onChange: (v: YesNo) => void }) {
   return (
     <View accessibilityRole="radiogroup">
@@ -217,4 +407,25 @@ const s = StyleSheet.create({
   },
   tipIcon: { fontSize: 20 },
   tipText: { flex: 1, fontSize: 15, lineHeight: 21, color: colors.textMuted },
+  present: { marginBottom: 18 },
+  presentLabel: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 8 },
+  presentValue: {
+    minHeight: TAP_HEIGHT,
+    lineHeight: TAP_HEIGHT,
+    fontSize: 18,
+    color: colors.textMuted,
+    paddingHorizontal: 16,
+  },
+  groupLabel: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 10 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  card: {
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: 16,
+    paddingBottom: 0,
+    marginBottom: 14,
+  },
+  cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: -8 },
+  cardTitle: { fontSize: 15, fontWeight: '600', color: colors.textMuted },
 });
